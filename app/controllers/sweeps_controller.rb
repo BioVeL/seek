@@ -7,6 +7,7 @@ class SweepsController < ApplicationController
 
   before_filter :find_sweep, :except => [:create, :new, :index]
   before_filter :find_run, :only => :new
+  before_filter :parse_csv, :only => :create
   before_filter :set_runlet_parameters, :only => :create
   before_filter :find_workflow_and_version, :only => :new
   before_filter :auth, :except => [ :index, :new, :create ]
@@ -185,7 +186,7 @@ class SweepsController < ApplicationController
         flash[:error] = "You are not authorized to #{action} this Sweep."
       end
       respond_to do |format|
-        format.html do
+        format.html dol
           case action
             when 'manage','edit','download','delete'
               redirect_to @sweep
@@ -201,4 +202,30 @@ class SweepsController < ApplicationController
     @sweep = Sweep.find(params[:id], :include => :runs)
   end
 
+  # Extract values from a CSV
+def parse_csv
+  unless params[:csv_file].blank? || params[:input_type] == 'manual'
+    csv = CSV.parse(params[:csv_file].read)
+
+    input_names = csv.shift.map(&:strip)
+
+    # Check input names from CSV match those in workflow
+    workflow = Workflow.find(params[:sweep][:workflow_id]).find_version(params[:sweep][:workflow_version])
+    workflow_input_names = workflow.input_ports.map(&:name)
+    if workflow_input_names.sort != input_names.sort
+      raise("The inputs provided in the CSV do not match the workflow input names. \n\nCSV: #{input_names.inspect}\n\nWorkflow: #{workflow_input_names.inspect}")
+    end
+
+    params[:sweep][:runs_attributes] = {}
+    params[:sweep].delete(:shared_input_values_for_all_runs)
+
+    csv.each_with_index do |input_values, run_index|
+      run_attributes = {:inputs_attributes => {}}
+      input_values.each_with_index do |input_value, input_index|
+        run_attributes[:inputs_attributes][input_index] = {:value => input_value, :name => input_names[input_index]}
+      end
+
+      params[:sweep][:runs_attributes][run_index] = run_attributes
+    end
+  end
 end
