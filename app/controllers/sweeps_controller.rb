@@ -186,7 +186,7 @@ class SweepsController < ApplicationController
         flash[:error] = "You are not authorized to #{action} this Sweep."
       end
       respond_to do |format|
-        format.html dol
+        format.html do
           case action
             when 'manage','edit','download','delete'
               redirect_to @sweep
