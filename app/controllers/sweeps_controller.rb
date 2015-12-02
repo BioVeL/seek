@@ -113,7 +113,7 @@ class SweepsController < ApplicationController
 
       respond_to do |format|
         format.html {send_file path, :type => "application/zip",
-          :filename => path.split('/').last }
+                               :filename => path.split('/').last }
       end
     end
   end
@@ -203,29 +203,31 @@ class SweepsController < ApplicationController
   end
 
   # Extract values from a CSV
-def parse_csv
-  unless params[:csv_file].blank? || params[:input_type] == 'manual'
-    csv = CSV.parse(params[:csv_file].read)
+  def parse_csv
+    unless params[:csv_file].blank? || params[:input_type] == 'manual'
+      csv = CSV.parse(params[:csv_file].read)
 
-    input_names = csv.shift.map(&:strip)
+      input_names = csv.shift.map(&:strip)
 
-    # Check input names from CSV match those in workflow
-    workflow = Workflow.find(params[:sweep][:workflow_id]).find_version(params[:sweep][:workflow_version])
-    workflow_input_names = workflow.input_ports.map(&:name)
-    if workflow_input_names.sort != input_names.sort
-      raise("The inputs provided in the CSV do not match the workflow input names. \n\nCSV: #{input_names.inspect}\n\nWorkflow: #{workflow_input_names.inspect}")
-    end
-
-    params[:sweep][:runs_attributes] = {}
-    params[:sweep].delete(:shared_input_values_for_all_runs)
-
-    csv.each_with_index do |input_values, run_index|
-      run_attributes = {:inputs_attributes => {}}
-      input_values.each_with_index do |input_value, input_index|
-        run_attributes[:inputs_attributes][input_index] = {:value => input_value, :name => input_names[input_index]}
+      # Check input names from CSV match those in workflow
+      workflow = Workflow.find(params[:sweep][:workflow_id]).find_version(params[:sweep][:workflow_version])
+      workflow_input_names = workflow.input_ports.map(&:name)
+      if workflow_input_names.sort != input_names.sort
+        raise("The inputs provided in the CSV do not match the workflow input names. \n\nCSV: #{input_names.inspect}\n\nWorkflow: #{workflow_input_names.inspect}")
       end
 
-      params[:sweep][:runs_attributes][run_index] = run_attributes
+      params[:sweep][:runs_attributes] = {}
+      params[:sweep].delete(:shared_input_values_for_all_runs)
+
+      csv.each_with_index do |input_values, run_index|
+        run_attributes = {:inputs_attributes => {}}
+        input_values.each_with_index do |input_value, input_index|
+          run_attributes[:inputs_attributes][input_index] = {:value => input_value, :name => input_names[input_index]}
+        end
+
+        params[:sweep][:runs_attributes][run_index] = run_attributes
+      end
     end
   end
+
 end
